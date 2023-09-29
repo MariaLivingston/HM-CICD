@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+    environment {
+	    PATH = "/opt/maven/bin:$PATH"
+    }    
+	stages {
+	    stage('Cloning code') {
+            steps {
+			   checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/MariaLivingston/hello-world.git']])
+			}
+		}
+		stage ('build code') {
+		    steps {
+			  sh "mvn clean install"
+			}
+		}
+		stage ('build code') {
+		    steps {
+		       sshPublisher(publishers: [sshPublisherDesc(configName: 'docker host', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''cd /opt/docker;
+               docker build -t regapp:v1 .;
+               docker stop registerapp;
+               docker rm registerapp;
+               docker run -d --name registerapp -p 8087:8080 regapp:v1;
+               aws ecr get-login-password --region us-west-1 | docker login --username AWS --password-stdin 184235429893.dkr.ecr.us-west-1.amazonaws.com;
+               docker tag regapp:v1 184235429893.dkr.ecr.us-west-1.amazonaws.com/dockerregistry:v1;
+               docker push 184235429893.dkr.ecr.us-west-1.amazonaws.com/dockerregistry:v1
+               ''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '//opt//docker', remoteDirectorySDF: false, removePrefix: 'webapp/target/', sourceFiles: 'webapp/target/*.war')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+            }
+		}    
+	}
+}	
